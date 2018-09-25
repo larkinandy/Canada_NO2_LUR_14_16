@@ -18,12 +18,12 @@ Variables in the codebook are partitioned into distance-based, point-based, and 
 
 #### Point based variables ####
 
-- **elevation ** - air monitor elevation level. Units: meters. Datatype: Int. Datasource: 7.
-- **mean_20YY ** - annual mean NO2 concentration. Units: ppb. Datatype: Int.  Datasource: 7.
-- **meanNO2_2014_2016 ** - average of annual mean NO2 concentrations from 2014 to 2016. Units: ppb. Datatype: Float. Datasource: 7.
-- **NAPS ID ** - air monitor station id. Datatype: Int. Datasource: 7.
-- **numObs ** - number of annual mean NO2 concentration measures between 2014 and 2016. Datatype: Int.  Datasource: 7.
-- **percent completeness_20YY ** - percent air monitor coverage for year YY. Datatype: Int. Datasource: 7.
+- **elevation** - air monitor elevation level. Units: meters. Datatype: Int. Datasource: 7.
+- **mean_20YY** - annual mean NO2 concentration. Units: ppb. Datatype: Int.  Datasource: 7.
+- **meanNO2_2014_2016** - average of annual mean NO2 concentrations from 2014 to 2016. Units: ppb. Datatype: Float. Datasource: 7.
+- **NAPS ID** - air monitor station id. Datatype: Int. Datasource: 7.
+- **numObs** - number of annual mean NO2 concentration measures between 2014 and 2016. Datatype: Int.  Datasource: 7.
+- **percent completeness_20YY** - percent air monitor coverage for year YY. Datatype: Int. Datasource: 7.
 - **pr_YY** - annual mean daily precipitation for year YY. Units: nm. Datatpye: Float. Datasource: 1.
 - **pr_14_16** - mean of pr_14, pr_15, and pr_16. Units: nm. Datatype: Float. Datasource: 1.
 - **te_YY** - annual mean daily max temperature for year YY. Units: degrees celcius. Datatype: Float. Datasource: 1.
@@ -43,21 +43,21 @@ buffer distances range from 10m to 20km.  Units are in meters and the datatype i
 - **fRXXXXm** - length of roads with truck restrictions in buffer distance XXXX. Datasource: 5.
 - **RaXXXXm** - length of railway and transit lines in buffer distance XXXX. Datasource: 5.
 - **waXXXXm** - percent area water in buffer distance XXXX.  Datasource 3.
-- **NDVI_14_16_XXXXm ** - three year (2014-2016) average of mean value of max annual NDVI in buffer distance XXXX. Datasource: 4.
+- **NDVI_14_16_XXXXm** - three year (2014-2016) average of mean value of max annual NDVI in buffer distance XXXX. Datasource: 4.
 - **NYXXXXm** - mean value of max annual NDVI in buffer distance XXXX for year 201Y. Datasource 4.
 
 
 
 ### Datasources ###
 
-1. **Daymet V3: Daily Surface Weather and Climatological Summaries. **  Author: NASA.  Spatial Resolution: 1000m. Temporal Resolution: Daily. Downloaded from the Google Earth Engine (https://explorer.earthengine.google.com/#detail/NASA%2FORNL%2FDAYMET_V3) <br>
-2. **Geddes, J. A.; Martin, R. V.; Boys, B. L.; van Donkelaar, A. Long-term trends worldwide in ambient NO2 concentrations inferred from satellite observations. Environ. Health Perspect. Online 2016, 124 (3), 281. ** Spatial Resolution: 1km.  Temporal Resolution: three year rolling average.  <br> 
+1. **Daymet V3: Daily Surface Weather and Climatological Summaries**  Author: NASA.  Spatial Resolution: 1000m. Temporal Resolution: Daily. Downloaded from the Google Earth Engine (https://explorer.earthengine.google.com/#detail/NASA%2FORNL%2FDAYMET_V3) <br>
+2. **Geddes, J. A.; Martin, R. V.; Boys, B. L.; van Donkelaar, A. Long-term trends worldwide in ambient NO2 concentrations inferred from satellite observations. Environ. Health Perspect. Online 2016, 124 (3), 281** Spatial Resolution: 1km.  Temporal Resolution: three year rolling average.  <br> 
 3. **GLCF: Landsat Global Inland Water.** Author: GCLF.  Spatial Resolution: 30m.  Temporal Resolution: Basd on year 2000.  Downloaded from Google Earth Engine (https://developers.google.com/earth-engine/datasets/catalog/GLCF_GLS_WATER)
 4. **Landsat 8 Collection 1 Tier 1 8-Day NDVI Composite. ** Author: Google.  Spatial Resolution: 30m.  Temporal Resolution: 8day.  Downloaded from Google Earth Engine (https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C01_T1_8DAY_NDVI).  
-5. **Canda Geospatial Data. ** Author: DTMI. Spatial Resolution: NA.  Temporal Resolution: Annual, 2015.
-6. **Population Density. ** Author: Statistics Canada.  Spatial Resolution: Census Block.  Temporal Resolution: Based on year 2016.
-7. **National Air Pollutants Surveillance Program NO2 Measurements. ** Author: Department of the Environment, Canada.  Spatial Resolution: NA.  Temporal Resolution: Annual.
-8. **National Pollutant Release Inventory. ** Author: Department of the Environment, Canada. Spatial Resolution: NA. Temporal Resolution: Annual, based on year 2016. 
+5. **Canda Geospatial Data.** Author: DTMI. Spatial Resolution: NA.  Temporal Resolution: Annual, 2015.
+6. **Population Density.** Author: Statistics Canada.  Spatial Resolution: Census Block.  Temporal Resolution: Based on year 2016.
+7. **National Air Pollutants Surveillance Program NO2 Measurements** Author: Department of the Environment, Canada.  Spatial Resolution: NA.  Temporal Resolution: Annual.
+8. **National Pollutant Release Inventory** Author: Department of the Environment, Canada. Spatial Resolution: NA. Temporal Resolution: Annual, based on year 2016. 
 
 ### Processing Scripts ###
 

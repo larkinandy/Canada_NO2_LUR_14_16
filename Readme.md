@@ -41,7 +41,7 @@ buffer distances range from 10m to 20km.  Units are in meters and the datatype i
 - **clXXXXm** - sum area of residential land use in buffer distance XXXX. Datasource 5.
 - **cRXXXXm** - length of highways in buffer distance XXXX. Datasource: 5. 
 - **dRXXXXm** - length of local roads in buffer distance XXXX. Datasource: 5.
-- **eRXXXXm** - length of local roads in buffer distance XXXX. Datasource: 5.
+- **eRXXXXm** - length of major roads in buffer distance XXXX. Datasource: 5.
 - **fRXXXXm** - length of roads with truck restrictions in buffer distance XXXX. Datasource: 5.
 - **RaXXXXm** - length of railway and transit lines in buffer distance XXXX. Datasource: 5.
 - **waXXXXm** - percent area water in buffer distance XXXX.  Datasource 3.

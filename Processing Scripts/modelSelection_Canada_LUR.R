@@ -25,7 +25,7 @@ library(glmnet) # lasso regression
 posCoeffMatrix <- function(inData) {
   tempNames <- names(inData)
   endLength <- length(tempNames)
-  switchList <- c("tr","ND","wa","us","oe") # list of two characters that indicate protective variables
+  switchList <- c("bL","ND","wa","pr","port_dist") # list of two characters that indicate protective variables
   # for each variable in the dataset, check if the variable is in the list of protective variables.
   # if the variable is protective, multiply the value by 1
   for(i in 1:endLength) {
@@ -88,44 +88,6 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL, save) {
 
 
 
-
-
-
-# add a categorical variable indicating which continent that monitor data is from
-# INPUTS:
-#    inputData (dataframe) - matrix containing dataset 
-# OuTPUTS:
-#    outputList (dataframe) - same matrix as input data, but with an added region
-#                             variable
-addZoneField <- function(InputData) {
-  
-  
-  # create a list of all continents, along with a vector indicating which number
-  # corresponds to which continent
-  continentList <- c("North America","South America","Europe", "Africa","Asia")
-  zoneList <- c(1,3,4,6,7)
-  
-  # combine Oceania and Australia together to create a single oceania continental region
-  # use OCeania as the seed for the output dataset
-  outputList <- subset(InputData, CONTINENT == "Oceania" | CONTINENT == "Australia")
-  tempZone <- rep(9,length(outputList[,1]))
-  outputList$zone <- tempZone
-  
-  # for each continent except oceania, add the subset to the output dataset along with 
-  # the corresponding continental region value
-  for(index in 1:length(continentList)) {
-    tempData <- subset(InputData,CONTINENT == continentList[index])
-    tempData$zone <- zoneList[index]
-    outputList <- rbind(outputList,tempData)
-  }
-  
-  return(outputList)
-  
-} # end of addZoneField
-
-
-
-
 # identify the buffer sizes included in the variales in the input dataset.  This is done
 # by removing the first two characters from each variable and converting the remaining 
 # characters from characters to an integer value
@@ -179,7 +141,7 @@ reduceBuffList <- function(inputData,fold=3) {
 reduceLassoModel <- function(inCoef,inPred,fold=5) {
   
   # create a vector of the first two characters for all variables
-  bufferTypes <- c("fi","im","mj","mi","po","ND","tr","pl","uj","ui") 
+  bufferTypes <- c("aL","bL","bR","cL","cR","dR","eR","fR","wa","NDVI_14_16_") 
   
   a <- which(inCoef > 0) # identify which variables were selected by lasso regression
   b <- a[2:length(a)]-1 # remove the intercept from the model 
@@ -193,7 +155,9 @@ reduceLassoModel <- function(inCoef,inPred,fold=5) {
     
     # get the the distances for all buffers of the selected variable type
     if(length(tempData)>0) {
+      cat(tempData)
       buffList <- getBuffDistVec(tempData)
+      cat(buffList)
       reduced <- reduceBuffList(buffList,fold)
       m <- "m"
       reduced <- paste(bufferTypes[index],reduced,m,sep="")
@@ -204,262 +168,9 @@ reduceLassoModel <- function(inCoef,inPred,fold=5) {
   otherVars <- subNames[substr(subNames,1,2) %in% bufferTypes == FALSE]
   finalList <- c(finalList,otherVars)
   return(finalList)
-} # end of reduceLassoModel
+} # end of reduceLassoMode
 
 
-
-# get the summary statistics for each region.  Summary statistics include RMSE, AME, R2, Adj R2, MB, and MAB
-# INPUTS:
-#    inData (float array) - array of residuals
-#    inZone (int array) - array of zone labels for other input variables
-#    inMonitor (float array) - monitor measurements
-#    p (integer) - number of variables in the model that corresponds to the residuals
-# OuTPUTS:
-#    returnData (dataframe) - dataframe containing summary statistics.  Each row corresponds to a 
-#                             unique continental region
-residualsByZone <- function(inData,inZone,inMonitor,p) {
-  
-  uniqueZones <- unique(inZone)[order(unique(inZone))] # get the unique zones in the dataset
-  RMSE <- rsq <- adjRsq <- ase <- percBias <- bias <- rep(0,length(uniqueZones)+1)
-  
-  # for each unique zone, subset the residuals and monitors that correspond to the zone.  Then
-  # calculate the summary statistics for that zone
-  for(i in 1:length(uniqueZones)) {
-    tempData <- subset(inData,inZone==uniqueZones[i])
-    tempMonitor <- subset(inMonitor,inZone == uniqueZones[i])
-    RMSE[i] <- sqrt(mean(tempData^2))
-    sumSqErr <- sum(tempData^2)
-    sumTot <- sum((tempMonitor - mean(tempMonitor))^2)
-    n <- length(tempData)
-    rsq[i] <- 1 - (sumSqErr/sumTot)
-    adjRsq[i] <- 1 - (((1-rsq[i])*(n-1))/(n-p-1))
-    ase[i] <- mean(abs(tempData))
-    percBias[i] <- (100/length(tempData))*(sum(abs(tempData)/tempMonitor))
-    bias[i] <- (-100/length(tempData))*(sum(tempData/tempMonitor))
-  }
-  
-  # calculate summary statistics for the entire global dataset
-  RMSE[length(RMSE)] <- sqrt(mean(inData^2))
-  meanMonitor <- mean(inMonitor)
-  sumSqErr <- sum(inData^2)
-  sumTot <- sum((inMonitor - meanMonitor)^2)
-  rsq[length(rsq)] <- 1 - (sumSqErr/sumTot)
-  n <- length(inMonitor)
-  adjRsq[length(rsq)] <- 1 - (((1-rsq[length(rsq)])*(n-1))/(n-p-1))
-  ase[i+1] <- mean(abs(inData))
-  percBias[i+1] <- (100/length(inData))*(sum(abs(inData)/inMonitor))
-  bias[i+1] <- (-100/length(inData))*(sum(inData/inMonitor))
-  returnData <- data.frame(RMSE,ase,rsq,adjRsq,bias,percBias,c(uniqueZones,0))
-  return(returnData)
-} # end of residualsByZone
-
-
-
-
-
-
-# create a multipanel plot of the residuals for each continental region.  
-# INPUTS:
-#    predictions (float array) - array containing the model predictions
-#    zoneVals (int array) - array containing zone values for predictions and monitors
-#    monitor (float array) - array containing the monitor values
-#    outputFilename (string) - output file name and filepath
-#    plotType (string) - type of plot to make
-makeResidPlots <- function(predictions,zoneVals,monitor,outputFileName) {
-  uniqueZones <- unique(zoneVals)[order(unique(zoneVals))] # get unique zone values
-  
-  # if the only unique zone values is 9999, create a single global images
-  if(uniqueZones==-9999) { 
-    
-    # define graph variables
-    zoneNames <- c("Global")
-    yLab = "monitor aveage (ppb)"
-    xLab <- "predicted (ppb)"
-    maxVal <- max(max(predictions),max(monitor))
-    minVal <- min(min(predictions),min(monitor))
-    predictions2 <- data.frame(predictions,monitor)
-    
-    # create the graph
-    ggplot(data = predictions2, aes(x=predictions, y=monitor)) + geom_point() + 
-      ggtitle(zoneNames[1]) + labs(x=xLab,y=yLab) + ylim(minVal,maxVal) + xlim(0,maxVal) + 
-      geom_smooth(method = "lm", se = FALSE) + geom_abline(intercept=0,slope=1)
-    #dev.off()
-  }
-  
-  # create subset plots for each continental region
-  else {
-    zoneNames <- c("North America","South America","Europe","Africa","Asia","Oceania")
-    par(mfrow = c(3, 2))
-    yLab = "monitor aveage (ppb)"
-    
-    # for each continental region, create sub plots
-    for(i in 1:length(uniqueZones)) {
-      tempResid <- subset(predictions,zoneVals==uniqueZones[i])
-      tempMonitor <- subset(monitor,zoneVals == uniqueZones[i])
-      xLab <- "predicted (ppb)"
-      maxVal <- max(max(tempResid),max(tempMonitor))
-      minVal <- min(min(tempResid),min(tempMonitor))
-      tempData <- data.frame(tempResid,tempMonitor)
-      tempPlot <- ggplot(data = tempData, aes(x=tempResid, y=tempMonitor)) + geom_point() + 
-        ggtitle(zoneNames[i]) + labs(x=xLab,y=yLab) + ylim(minVal,maxVal) + xlim(0,maxVal) + 
-        geom_smooth(method = "lm", se = FALSE) + geom_abline(intercept=0,slope=1)
-      assign(paste("p",as.character(i),sep=""), tempPlot)
-    }
-    #plot(tempMonitor,tempResid,xlim=c(minVal,maxVal),ylim=c(minVal,maxVal),title=)
-    multiplot(p1,p2,p3,p4,p5,p6, cols = 2,save = outputFileName)
-  }
-} # end of makeResidPlots
-
-
-
-# create country dummy variables
-# INPUTS:
-#    inData (dataframe) - matrix containing input predictor matrix
-#    zoneVals (int array) - array indicating continental region for each row
-# OUTPUTS:
-#    inData (dataframe) - same as the inData but with country intercept variables 
-#                         added
-createCountryIntercepts <- function(inData,zoneVals) {
-  inData$z1 <- (zoneVals == 1)*1
-  inData$z3 <- (zoneVals == 3)*1
-  inData$z4 <- (zoneVals == 4)*1
-  inData$z6 <- (zoneVals == 6)*1
-  inData$z7 <- (zoneVals == 7)*1
-  inData$z9 <- (zoneVals == 9)*1
-  return(inData)
-} # end of createCountryIntercepts
-
-
-
-
-# calculate and graph the partial R2 values for all variables and continental regions.
-# INPUTS:
-#    inData (dataframe) - data matrix containing predictor variables
-#    inMonitor (float array) - array containing monitor measurements
-#    outFile (string) - filepath and name of the output .eps file
-graphPartialR2 <- function(inData, inMonitor, outFile) {
-  uniqueZoneVals <- c(0,1,3,4,6,7,9) # list of all of the unique continental regions
-  
-  # for each continental region, subest the predictor matrix and monitors to the region of interest
-  for(zoneVal in 1:length(uniqueZoneVals)) {
-    
-    if(uniqueZoneVals[zoneVal] == 0) {
-      tempMat <- as.matrix(inData)
-      tempMonitor <- inMonitor
-    }
-    
-    else {
-      tempMat <- subset(as.matrix(inData),exactMonitors$zone == uniqueZoneVals[zoneVal])
-      tempMonitor <- subset(inMonitor,exactMonitors$zone == uniqueZoneVals[zoneVal])
-      cat(zoneVal)
-    }
-    
-    partialR2 <- rep(0,length(inData))
-    lmTotal <- lm(tempMonitor~tempMat)
-    
-    # claculate partial R2 for all variables in the dataset
-    ssrTot <- sum(anova(lmTotal)$"Sum Sq"[1:2])
-    sseTot <- anova(lmTotal)$"Sum Sq"[2]
-    for(i in 1:length(inData)) {
-      tempRemove <- names(inData)[i]
-      tempData <- tempMat[ , !names(inData) %in% tempRemove]
-      tempLm <- lm(tempMonitor~tempData)
-      tempSSR <- anova(tempLm)$"Sum Sq"[1]
-      tempSSE <- anova(tempLm)$"Sum Sq"[2]
-      partialR2[i] <- (tempSSE - sseTot)/tempSSE
-      
-      if(zoneVal == 1) {
-        cat(partialR2[i])
-        cat("\n")
-      }
-    }
-    
-    if(uniqueZoneVals[zoneVal]==0) {
-      valMat <- round(partialR2*100,2)
-      
-    }
-    else {
-      valMat <- cbind(valMat,round(partialR2*100,2))
-      cat(length(valMat[,1]))
-      cat("\n")
-    }
-  }
-  
-  library(gplots)
-  library(RColorBrewer)
-  
-  valMat <- data.frame(valMat[1:15,])
-  names(valMat) <-c("Global","N America","S America","Europe","Africa","Asia","Oceania")
-  rownames(valMat) <- names(inData)[1:15]
-  
-  
-  # define parameters for creating heatmap
-  
-  "#FF2400"
-  my_palette <- colorRampPalette(c("#E62020", "yellow", "green"))(n = 299)
-  
-  
-  # (optional) defines the color breaks manually for a "skewed" color transition
-  col_breaks = c(seq(0,0.49,length=100),   # for red
-                 seq(0.5,1.49,length=100),            # for yellow
-                 seq(1.5,2.5,length=100))              # for green
-  
-  row_distance = dist(valMat, method = "manhattan")
-  row_cluster = hclust(row_distance, method = "ward.D")
-  col_distance = dist(t(valMat), method = "manhattan")
-  col_cluster = hclust(col_distance, method = "ward.D")
-  
-  setEPS()
-  postscript(outFile)
-  
-  heatmap.2(as.matrix(valMat),
-            cellnote = valMat,  # same data set for cell labels
-            main = "Partial R2 2 Fold", # heat map title
-            notecol = "black",      # change font color of cell labels to black#
-            density.info = "none",  # turns off density plot inside color legend
-            trace = "none",         # turns off trace lines inside the heat map
-            margins = c(12,9),     # widens margins around plot
-            col = my_palette,   
-            breaks=col_breaks,# use on color palette defined earlier
-            Rowv = as.dendrogram(row_cluster), # apply default clustering method
-            Colv = as.dendrogram(col_cluster), # apply default clustering method
-            dendrogram = "none")
-  
-  dev.off()
-} # end of graphPartialR2
-
-
-
-
-
-
-# calculate the minimum p-value of each variable for all continental and global regions
-# INPUTS:
-#    inMatrix (dataframe) - data matrix containing predictor variables
-#    inMonitor (float array) - array containing monitor measurements
-#    inZones (int array) - array indicating which zones each row of data belongs to
-# OUTPUTS:
-#    minPVals (int array) - array containing minimum p-values for each variable, in the same
-#                           order as the predictor variables in the inMatrix
-calcMinPValue <- function(inMatrix,inMonitor,inZones) {
-  uniqueZones <- c(1,3,4,6,7,9) # identify unique continental regions
-  minPVals <- rep(100,14) # create vector for p vals
-  
-  # for each continental region, subset the predictor matrix to the continental region, and 
-  # calculate the pvals.  If the p vals are less than current min pvals, then update the pvals
-  for(i in 1:length(uniqueZones)) {
-    tempData <- subset(inMatrix,inZones==uniqueZones[i])
-    tempMonitors <- subset(inMonitor,inZones==uniqueZones[i])
-    tempModel <- summary(lm(tempMonitors ~ tempData))
-    pVals <- tempModel$coefficients[,4]
-    for(j in 1:length(pVals)) {
-      if(pVals[j]<minPVals[j]) {
-        minPVals[j] <- pVals[j]
-      }
-    }
-  }
-  return(minPVals)
-} # end of calcMinPValue
 
 
 
@@ -478,99 +189,411 @@ calcIQR <- function(inMatrix) {
 } # end of calcIQR
 
 
+
+# remove variables that don't have enough measurements greater than 0 in the input dataset
+# INPUTS:
+#   inData (dataframe) - dataset containing predictor variables
+#   minNumObs (int) - minimum number of observations that a dataset must contain
+# OUTPUTS:
+#   drops (string array) - names of the variables that don't have minNumObs number of observations in 
+#   inData
+restrictBuffsByNumObs <-function(inData,minNumObs) 
+{
+  attach(inData)
+  vars <- names(inData)
+  for(i in 1:length(vars)) 
+  {
+    currVar <- get(vars[i])
+    nObs <- length(inData[currVar>0,1])
+    if(minNumObs > nObs) 
+    {
+      drops <- c(drops,vars[i])
+    }
+  }
+  detach(inData)
+  return(drops)
+}
+
+
+
+calcPercentGreaterThan0 <-function(inData,minNumObs) 
+{
+  attach(inData)
+  vars <- names(inData)
+  totalObs <- length(inData[,1])
+  percentObs <- rep(0,length(vars))
+  for(i in 1:length(vars)) 
+  {
+    currVar <- get(vars[i])
+    nObs <- length(inData[currVar>0,1])
+    percentObs[i] <- nObs/totalObs
+  }
+  detach(inData)
+  return(percentObs)
+}
+
+
+subsetRoads <- function(inData,keepsat = TRUE) {
+  roadsLabel <- c("bR","cR","dR","eR","fR","alRds")
+  keeps <- c()
+  bufferDists <- c(50,100,250,500,750,1000,2000,3000,4000,5000,10000,15000,20000)
+  for(i in 1:length(roadsLabel))
+  {
+    for(j in 1:length(bufferDists)) 
+    {
+      varName <- paste(roadsLabel[i],as.character(bufferDists[j]),"m", sep="")
+      keeps <- c(keeps, varName)
+    }
+    
+  }
+  if(keepsat) keeps <- c(keeps,"sat_10_12")
+  returnData <- inData[ , (names(inData) %in% keeps)]
+  return(returnData)
+}
+
+subsetBuiltEnv <- function(inData,keepProtectors = TRUE,keepsat = TRUE)
+{
+  builtEnvLabel <- c("aL","bL","cL")
+  if(keepProtectors) builtEnvLabel <- c(builtEnvLabel,"wa","NDVI_14_16_")
+  keeps <- c()
+  bufferDists <- c(50,100,250,500,750,1000,2000,3000,4000,5000,10000,15000,20000)
+  for(i in 1:length(builtEnvLabel))
+  {
+    for(j in 1:length(bufferDists)) 
+    {
+      varName <- paste(builtEnvLabel[i],as.character(bufferDists[j]),"m", sep="")
+      keeps <- c(keeps, varName)
+    }
+  }
+  if(keepsat) keeps <- c(keeps,"sat_10_12")
+  returnData <- inData[ , (names(inData) %in% keeps)]
+  return(returnData)
+}
+
+dropNDVI <- function(inData)
+{
+  dropLabel <- c("NDVI_14_16_")
+  drops <- c()
+  bufferDists <- c(500,750,1000,2000,3000,4000,5000,10000,15000,20000)
+  for(i in 1:length(dropLabel))
+  {
+    for(j in 1:length(bufferDists)) 
+    {
+      varName <- paste(dropLabel[i],as.character(bufferDists[j]),"m", sep="")
+      drops <- c(drops, varName)
+    }
+  }
+  returnData <- inData[ , !(names(inData) %in% drops)]
+  return(returnData)
+}
+
+
+
+createLassoModel <- function(inData) 
+{
+  
+  tempMat <- as.matrix(posCoeffMatrix(inData)) # reverse direction of protective variabless
+  cvfit <- glmnet::cv.glmnet(tempMat,NO2_vals,type.measure = "mse",standardize=TRUE,alpha = 1,lower.limit=0) # perform lasso regression
+  coefRaw <- coef(cvfit, s = "lambda.1se")
+  keeps <- reduceLassoModel(coefRaw,inData,3)
+  
+  return(keeps)
+}
+
+
+
+
+# calculate and graph the partial R2 values for all variables and continental regions.
+# INPUTS:
+#    inData (dataframe) - data matrix containing predictor variables
+#    inMonitor (float array) - array containing monitor measurements
+calcPartialR2 <- function(inData, inMonitor) {
+  
+  tempMat <- as.matrix(inData)
+  tempMonitor <- inMonitor
+  partialR2 <- rep(0,length(inData))
+  lmTotal <- lm(tempMonitor~tempMat)
+  
+  
+  # claculate partial R2 for all variables in the dataset
+  ssrTot <- sum(anova(lmTotal)$"Sum Sq"[1:2])
+  sseTot <- anova(lmTotal)$"Sum Sq"[2]
+  for(i in 1:length(inData)) {
+    tempRemove <- names(inData)[i]
+    tempData <- tempMat[ , !names(inData) %in% tempRemove]
+    tempLm <- lm(tempMonitor~tempData)
+    tempSSR <- anova(tempLm)$"Sum Sq"[1]
+    tempSSE <- anova(tempLm)$"Sum Sq"[2]
+    partialR2[i] <- (tempSSE - sseTot)/tempSSE
+  }
+  
+  valMat <- round(partialR2*100,2)
+  
+  
+  return(valMat)
+  
+} # end of graphPartialR2
+
+
+
+
+
+# using an input dataset, randomly partition a training and testing dataset for cross-validation
+# INPUTS:
+#    inData (dataframe) - input dataset with predictor variables and air monitor measurements
+#    sampProp (float) - value ranging from 0 to 1, indicating the proportion of data that should be partitioned to the training dataset
+#    zoneVals (int vector) - indicates which zone the corresponding row of the input dataset belongs to
+# OutPUTS:
+#    returnData (dataframe) - input dataset with an indicator variable of whether each row belongs to the train or test partition
+createTrainAndTest <- function(inData,sampProp) {
+  
+  smp_size <- floor(sampProp* nrow(inData)) # calculate the sample size for the training dataset
+  cat(smp_size)
+  train_ind <- sample(seq_len(nrow(inData)), size = smp_size) # randomly sample the entire dataset to make the training dataset
+  train <- inData[train_ind, ]
+  test <- inData[-train_ind, ]
+  
+  
+  # create an indicator variable for whether a given sample (row in the dataset is a train or test point)
+  train$ind <- rep(0,nrow(train))
+  test$ind <- rep(1,nrow(test))
+  
+  returnData <- rbind(train,test) # combine the train and test dataset and return the result
+  return(returnData)
+} # end of createTrainAndTest
+
+
+
+
+
+
+# perform leave 10% out cross-validation numRep number of times.  Return the root mean square, mean abs square, r-square,
+# adjusted r-square, bias, and abs bias
+# INPUTS:
+#    inData (dataframe) - input data frame containing both the predictor and air monitor variables
+#    numReps (int) - number of cross-validation repititions to perform
+# OUTPUTS:
+#    returnData (dataframe) - summary statistics of the cross-validation, for each region
+crossValidation <- function(inPredictors,inMonitors,numReps,percTrain =0.8) {
+  
+  rmse <- ase <- rsq <- adjRsq <- bias <- absBias <- 0
+  
+  inPredictors$monitor <- inMonitors
+  combinedData <- inPredictors
+  
+  p <- 1
+  
+  
+  # for each cross-validation repitition
+  for(i in 1:numReps) {
+    cat(i) # print the repitition number to the screen
+    cat("\n")
+    
+    trainInd <- createTrainAndTest(combinedData,percTrain) # create training and testing datasets
+    
+    # partition trainInd into training and test datasets based on the indicator variable ind ( 0 = 1, 1 = test)
+    monitor <- trainInd$monitor 
+    trainInd <- trainInd[ , !(names(trainInd) %in% c("monitor"))]
+    trainSet <- subset(trainInd,ind == 0)
+    trainMonitor <- subset(monitor,trainInd$ind == 0)
+    testSet <- subset(trainInd,trainInd$ind == 1)
+    testMonitor <- subset(monitor,trainInd$ind == 1)
+    drops <- c("ind","monitor")
+    trainSet <- trainSet[ , !(names(testSet) %in% drops)]
+    testSet <- testSet[ , !(names(testSet) %in% drops)]
+    
+    lmModel <- lm(trainMonitor ~ aL2000m + NDVI_14_16_250m + sqTemp + logSat + sqAr + sqRa + sqPop  +  NDVI_14_16_250m  + logSat + sqTemp
+                  , data = trainSet)
+    coefRaw <- lmModel$coefficients
+    
+    testMat <- cbind(rep(1,nrow(testSet)),testSet)
+    
+    # create predictions for the test dataset based on the variables selected by the training dataset
+    #pred <- as.vector(coefRaw[1:length(coefRaw)]%*%t(testMat))
+    pred <- predict(lmModel,testSet)
+    residuals <- testMonitor-pred
+    n <- length(testMonitor)
+    
+    
+    # calculate summary statistics 
+    ase <- ase + mean(abs(residuals))
+    sumSqErr <- sum(residuals^2)
+    sumTot <- sum((testMonitor - mean(testMonitor))^2)
+    rsq <- 1 - (sumSqErr/sumTot)
+    rmse <- rmse + sqrt(mean(residuals^2))
+    adjRsq <- adjRsq + 1 - (((1-rsq)*(n-1))/(n-p-1))
+    absBias <- absBias + (100/length(residuals))*(sum(abs(residuals)/testMonitor))
+    bias <- bias + (-100/length(residuals))*(sum(residuals/testMonitor))
+    
+    
+  }
+  
+  ase <- ase/numReps
+  rmse <- rmse/numReps
+  absBias <- absBias/numReps
+  bias <- bias/numReps
+  adjRsq <- adjRsq/numReps
+  
+  returnData <- data.frame(rmse,ase,adjRsq,bias,absBias) # combine evaluation statistics into a dataframe to return as output
+  return(returnData)
+  
+} # end of crossValidation
+
+
+
+
+# create predictions for the test dataset based on the variables selected by the training dataset
+#pred <- as.vector(coefRaw[1:length(coefRaw)]%*%t(testMat))
+pred <- predict(lmModel,candidateModel)
+residuals <- NO2_vals-pred
+n <- length(NO2_vals)
+
+# calculate summary statistics 
+ase <- mean(abs(residuals))
+sumSqErr <- sum(residuals^2)
+sumTot <- sum((NO2_vals - mean(NO2_vals))^2)
+rsq <- 1 - (sumSqErr/sumTot)
+mse <- sqrt(mean(residuals^2))
+n <- length(residuals)
+p <- 1
+adjRsq <- 1 - (((1-rsq)*(n-1))/(n-p-1))
+absBias <- (100/length(residuals))*(sum(abs(residuals)/NO2_vals))
+bias <- (-100/length(residuals))*(sum(residuals/NO2_vals))
+
+
+
+
+
 ################# main script #################
 
 library(ggplot2)
 library(glmnet)
 
-setwd("insert working directory here")
+#setwd("C:/users/larkinan/documents/Canada_NO2_LUR_14_16/Datasets")
+setwd("C:/users/larkinan/documents/Canada_NO2_LUR_14_16/Datasets")
 
 
+rawData <- read.csv("Canada_LUR_preprocessed_Sep17_18_v2.csv")
 
-rawData <- read.csv("insert csv file with data here")
+
 
 # setup data for processing
-exactMonitors <- addZoneField(rawData)
-exactMonitors <- subset(exactMonitors,numMeas >1 )
-exactMonitors <- subset(exactMonitors,minYr > 2003 )
-exactLat <- exactMonitors$latitude
-exactLong <- exactMonitors$longitude
-monitor <-  exactMonitors$meanNO2
-drops <- c("zone","X","FID","decLat","decLong","exact","latitude","longitude","minYr", "maxYr", "medYr", "minNO2", "meanNO2", "maxNO2", "stdDevNO2", "numMeas","FID","NAME","CONTINENT")
-exactMatrix <- exactMonitors[ , !(names(exactMonitors) %in% drops)]
+screenedData <- subset(rawData,elevation >-1)
+NO2_vals <-  screenedData$meanNO2_2014_2016
+drops <- c("meanNO2_2014_2016","NAPS.ID","percent.completeness_2013","percent.completeness_2014","percent.completeness_2015",
+           "percent.completeness_2016","mean_2013","mean_2014","mean_2015","mean_2016", "numObs", "medYr", "minNO2", "meanNO2", "maxNO2", "stdDevNO2", "numMeas","FID","NAME","CONTINENT")
+drops <- c(drops,"pr_14_16")
+drops <- restrictBuffsByNumObs(screenedData,10)
+exactMatrix <- screenedData[ , !(names(screenedData) %in% drops)]
+exactMatrix <- dropNDVI(exactMatrix)
+exactMatrix$logTemp <- log(exactMatrix$te_14_16+3)
+exactMatrix$sqTemp <- (exactMatrix$te+3)^2
+exactMatrix$logSat <- log(exactMatrix$sat_10_12)
+exactMatrix$sqAr <- sqrt(exactMatrix$aR250m)
+exactMatrix$sqRa <- sqrt(exactMatrix$Ra750m)
+exactMatrix$sqPop <- sqrt(exactMatrix$PD20000)
 
-
-
-######## run analysis on final model #########
-
-
-keeps <- c("ND200m","ND1200m","im7000m","im1500m","wa50000m","mj100m","mj2500m","po3500m","tr1500m","satNO2","z1","z3","z4","z6","z7","z9")
-
-
-exactMatrix2 <- createCountryIntercepts(exactMatrix,exactMonitors$zone) # create model with intercepts
-exactMatrix2 <- exactMatrix2[, (names(exactMatrix2) %in% keeps)] # reduce variables to final model structure
-tempMat <- as.matrix(posCoeffMatrix(exactMatrix2)) # reverse direction of protective variabless
-
-cvfit <- glmnet::cv.glmnet(tempMat,monitor,type.measure = "mse",standardize=TRUE,alpha = 1,lower.limit=0) # perform lasso regression
-coefRaw <- coef(cvfit,0)
-exactMat3 <- cbind(rep(1,length(tempMat[,1])),tempMat)
-
-# create predictions baesd on the regression
-pred <- as.vector(coefRaw[1:length(coefRaw)]%*%t(exactMat3))
-
-# calculate residuals and export to csv
-residuals <- monitor-pred
-residualsByZone(pred,exactMonitors$zone,monitor,13)
-residualData <- cbind(exactLat,exactLong,residuals)
-write.csv(residualData,"C:/users/user/desktop/residuals.csv")
-
-
-# graph predicted variables vs. monitor observations
-a<- data.frame(pred,monitor)
-ggplot(data= a,aes(x=pred,y=monitor)) + geom_point() + ylim(0,60) + xlim(0,60) + 
-  geom_abline(intercept=0,slope=1)+
-  ggtitle("a") + labs(x="Predicted (ppb)",y="Monitor average (ppb)") + ylim(0,60) + xlim(0,60) + 
-  geom_smooth(method = "lm", se = FALSE) + geom_abline(intercept=0,slope=1)
-
-# make residual plots for each continental region
-makeResidPlots(pred,exactMonitors$zone,monitor,"D:/residPlotsCountryIntercept2.png")
-
-# calculate the minimum p value 
-calcMinPValue(tempMat,monitor,exactMonitors$zone)
-
-######## create intercept models ############
-
-exactMatrix2 <- createCountryIntercepts(exactMatrix,exactMonitors$zone) # add intercept variables to model structure
-tempMat <- as.matrix(posCoeffMatrix(exactMatrix2)) # inverse the direction of protective variables
-
-# create a lasso regression model
-cvfit <- glmnet::cv.glmnet(tempMat,monitor,type.measure = "mse",standardize=TRUE,alpha = 1,lower.limit=0)
-
-# identify varaibles that should be kept in the second step of the model building
+tempMat <- as.matrix(posCoeffMatrix(exactMatrix)) # reverse direction of protective variabless
+cvfit <- glmnet::cv.glmnet(tempMat,NO2_vals,type.measure = "mse",standardize=TRUE,alpha = 1,lower.limit=0) # perform lasso regression
 coefRaw <- coef(cvfit, s = "lambda.1se")
 keeps <- reduceLassoModel(coefRaw,exactMatrix,3)
 
-# create model predictions and calculate residuals
-exactMat3 <- cbind(rep(1,length(tempMat[,1])),tempMat)
-pred <- as.vector(coefRaw[1:length(coefRaw)]%*%t(exactMat3))
-residuals <- monitor-pred
 
-# reduce model structure based variables that were identified to keep
-tempData2 <- exactMatrix[, (names(exactMatrix) %in% keeps)]
-tempData2 <- createCountryIntercepts(tempData2,exactMonitors$zone)
-exactMat2 <- as.matrix(posCoeffMatrix(tempData2))
+createLassoModel(exactMatrix)
 
-# refit the lasso regression model based on selected variables
-cvfit <- glmnet::cv.glmnet(exactMat2,monitor,type.measure = "mse",standardize=TRUE,alpha = 1, lower.limit=0)
-coefRaw<- coef(cvfit, s = 0)
-exactMat3 <- cbind(rep(1,length(exactMat2[,1])),exactMat2)
 
-# create predictions based on the updated model structure and calculate residuals
-pred <- as.vector(coefRaw[1:length(coefRaw)]%*%t(exactMat3))
-residuals <- monitor-pred
 
-# calculate summary statistics for the global dataset and each continental region
-residualsByZone(residuals,exactMonitors$zone,monitor,ncol(exactMat2))
+
+keeps <- c("aL2000m", "sqRa","sqAr","logSat","sqPop","sqTemp","NDVI_14_16_250m")
+candidateModel <- exactMatrix[ , (names(exactMatrix) %in% keeps)]
+calcPartialR2(candidateModel,NO2_vals)
+
+lmModel <- lm(NO2_vals~ as.matrix(candidateModel))
+predSub <- lmModel$fitted.values
+
+
+
+
+crossValidation(candidateModel,NO2_vals,10000,0.8)
+
+
+
+
+
+
+
+
+################## SUPPLEMENTAL SENSITIVITy ANALYSES ##############
+
+
+
+
+
+
+
+############### test for sensitivity to percent monitor requirement ############
+
+
+# at least 10 % of monitors have a value greater than 0
+summary(lm(NO2_vals ~ aL2000m + aR250m  + te_14_16 + pr_14_16 + sat_10_12 + PD20000  +  NDVI_14_16_250m  
+           , data = exactMatrix))
+
+
+# at least 25% of monitors have a value greater than 0
+summary(lm(NO2_vals ~ aL2000m  + Ra500m  + te_14_16 +pr_14_16+ sat_10_12 + PD20000  +  NDVI_14_16_250m 
+           , data = exactMatrix))
+
+
+# at least 50% of monitors have a value greater than 0
+summary(lm(NO2_vals ~ aL2000m + aR1000m   + te_14_16 + pr_14_16 +
+             sat_10_12 + PD20000 +  NDVI_14_16_250m,data=exactMatrix))
+
+
+
+############### create models restricted to specific land use classes ###############
+
+
+########### roads models ##############
+
+# without satellite 
+roadsData <- subsetRoads(exactMatrix,FALSE)
+createLassoModel(roadsData)
+linear_model <- lm(NO2_vals ~ eR2000m + dR15000m + alRds1000m, data = exactMatrix)
+
+# with satellite 
+roadsData <- subsetRoads(exactMatrix)
+createLassoModel(roadsData)
+linear_model <- lm(NO2_vals ~ eR2000m + sat_10_12 + dR15000m + alRds1000m, data = exactMatrix)
+
+
+############ meteorological models ###########
+
+# without satellite #
+linear_model <- lm(NO2_vals ~ pr_14_16 + te_14_16, data = exactMatrix)
+
+# with satellite #
+linear_model <- lm(NO2_vals ~ pr_14_16 + te_14_16 + sat_10_12, data = exactMatrix)
+
+
+
+############# built env models ##############
+
+builtEnvData <- subsetBuiltEnv(exactMatrix)
+
+# with protective variables and satellite
+createLassoModel(builtEnvData,FALSE)
+builtEnvData <- subsetBuiltEnv(exactMatrix,FALSE,TRUE)
+linear_model <- lm(NO2_vals ~ aL2000m + aL15000m + cL5000m + sat_10_12 + NDVI_14_16_250m + NDVI_14_16_2000m + NDVI_14_16_10000m, data = exactMatrix)
+builtEnvData <- subsetBuiltEnv(exactMatrix,FALSE)
+
+# with satellite but not protective variables
+createLassoModel(builtEnvData)
+linear_model <- lm(NO2_vals ~ aL2000m + aL10000m + cL5000m + sat_10_12, data = exactMatrix)
+
+# no satellite or protective variables 
+builtEnvData <- subsetBuiltEnv(exactMatrix,FALSE,FALSE)
+createLassoModel(builtEnvData)
+linear_model <- lm(NO2_vals ~  aL2000m + aL15000m + cL5000m , data = exactMatrix)
 
 
 

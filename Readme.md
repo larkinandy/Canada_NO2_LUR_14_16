@@ -1,9 +1,11 @@
-# Documentation for the 2014-2016 Canada NO2 LUR Model #
+![GitHub Logo](./Canada_Map.png)
 
 **Author:** [Andrew Larkin](https://www.linkedin.com/in/andrew-larkin-525ba3b5/) <br>
 **Affiliation:** [Oregon State University, College of Public Health and Human Sciences](https://health.oregonstate.edu/) <br>
 **Principal Investigator:** [Perry Hystad](https://health.oregonstate.edu/people/perry-hystad) <br>
 **Date Created:** September 14th, 2018
+
+
 
 ### Summary ###
 This notebook contains the codebook, datasources, and names of R and python scripts used to develop the 2014-2016 three year average LUR NO2 model for Canada.  The sections of the notebook are as follows: <br> <br>
